@@ -1,0 +1,114 @@
+plugins {
+    id 'java-library'
+    id 'eclipse'
+    id 'idea'
+    id 'net.neoforged.gradle.userdev' version '7.0.145'
+}
+
+version = '1.0.0'
+group = 'com.logblock'
+
+base {
+    archivesName = 'NeoLogblock'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+}
+
+// 'embed' configuration: classes are compiled against this AND packed into the output JAR
+configurations {
+    embed
+    implementation.extendsFrom(embed)
+}
+
+runs {
+    configureEach {
+        systemProperty 'forge.logging.markers', 'REGISTRIES'
+        systemProperty 'forge.logging.console.level', 'debug'
+        modSource project.sourceSets.main
+    }
+
+    server {
+        systemProperty 'forge.enabledGameTestNamespaces', 'logblock'
+        programArgument '--nogui'
+    }
+
+    data {
+        workingDirectory project.file('run-data')
+        programArguments.addAll '--mod', 'logblock', '--all',
+            '--output', file('src/generated/resources/').getAbsolutePath(),
+            '--existing', file('src/main/resources/').getAbsolutePath()
+    }
+}
+
+sourceSets.main.resources {
+    srcDir 'src/generated/resources'
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:21.1.172"
+
+    // SQLite JDBC embedded directly into the output JAR via the 'embed' configuration.
+    // The jar task's 'from' block below unpacks and includes all embed-config jars.
+    embed "org.xerial:sqlite-jdbc:3.47.1.0"
+
+    // HikariCP connection pool for the MySQL/MariaDB backend, bundled into the
+    // mod JAR (jar-in-jar style). transitive=false avoids pulling slf4j-api,
+    // which NeoForge already provides on the classpath.
+    embed("com.zaxxer:HikariCP:5.1.0") {
+        transitive = false
+    }
+}
+
+jar {
+    // Pack all 'embed' jars (i.e. SQLite) into the mod JAR
+    from {
+        configurations.embed.collect { dep ->
+            dep.isDirectory() ? dep : zipTree(dep)
+        }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes([
+            'Specification-Title'     : 'logblock',
+            'Specification-Vendor'    : 'logblock',
+            'Specification-Version'   : '1',
+            'Implementation-Title'    : project.name,
+            'Implementation-Version'  : project.jar.archiveVersion,
+            'Implementation-Vendor'   : 'logblock',
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+}
+
+tasks.withType(ProcessResources).configureEach {
+    def replaceProperties = [
+        minecraft_version      : '1.21.1',
+        minecraft_version_range: '[1.21.1,1.22)',
+        neo_version            : '21.1.172',
+        neo_version_range      : '[21.1,)',
+        loader_version_range   : '[4,)',
+        mod_id                 : 'logblock',
+        mod_name               : 'NeoLogblock',
+        mod_license            : 'MIT',
+        mod_version            : project.version,
+        mod_authors            : 'Neo (Neonekpro)',
+        mod_description        : 'Advanced grief logging and rollback mod for NeoForge. Author: Neo (Neonekpro).',
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/neoforge.mods.toml']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
