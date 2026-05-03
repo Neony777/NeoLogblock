@@ -5,7 +5,10 @@ import com.logblock.config.LogBlockConfig;
 import com.logblock.database.BlockLogEntry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -75,8 +78,10 @@ public class SignEditHandler {
         if (!LogBlockConfig.LOG_SIGNS.get()) return;
         if (LogBlockMod.getDatabase() == null) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        // EntityPlaceEvent#getLevel returns LevelAccessor; we only care about
+        // server-side Levels. Skip otherwise to avoid an unsafe cast.
+        if (!(event.getLevel() instanceof Level level)) return;
 
-        Level level = (Level) event.getLevel();
         BlockPos pos = event.getPos();
         // Only watch if the placed block is a sign; reading the block-entity
         // here is not reliable yet because the BE may be created in a follow-up
@@ -109,7 +114,10 @@ public class SignEditHandler {
             Watch w = entry.getValue();
             ServerPlayer player = server.getPlayerList().getPlayer(uuid);
             if (player == null) return true;
-            ServerLevel level = player.serverLevel();
+            // Look up the *watched* dimension by name rather than assuming the
+            // player is still in the same world (they may have teleported).
+            ServerLevel level = resolveLevel(server, w.world);
+            if (level == null) return true;
             BlockEntity be = level.getBlockEntity(w.pos);
             if (be instanceof SignBlockEntity sign) {
                 String currentText = extractText(sign);
@@ -131,26 +139,40 @@ public class SignEditHandler {
         });
     }
 
+    private static ServerLevel resolveLevel(MinecraftServer server, String dimensionName) {
+        try {
+            ResourceLocation loc = ResourceLocation.parse(dimensionName);
+            return server.getLevel(ResourceKey.create(Registries.DIMENSION, loc));
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     /**
-     * Extract a flat string of the sign's front + back text. Empty sides are
-     * skipped; non-empty lines are joined with " | ".
+     * Extract a flat string of the sign's front + back text. Sides are
+     * tagged with {@code F:} / {@code B:}; non-empty lines per side are
+     * joined with " | ". Empty sides are omitted entirely.
      */
     private static String extractText(SignBlockEntity sign) {
         StringBuilder sb = new StringBuilder();
-        appendSide(sb, sign.getFrontText());
-        appendSide(sb, sign.getBackText());
+        appendSide(sb, "F", sign.getFrontText());
+        appendSide(sb, "B", sign.getBackText());
         return sb.toString();
     }
 
-    private static void appendSide(StringBuilder sb, SignText text) {
+    private static void appendSide(StringBuilder sb, String label, SignText text) {
         if (text == null) return;
         Component[] msgs = text.getMessages(false);
+        StringBuilder lines = new StringBuilder();
         for (Component msg : msgs) {
-            String s = msg.getString();
+            String s = (msg == null) ? "" : msg.getString();
             if (s == null || s.isEmpty()) continue;
-            if (sb.length() > 0) sb.append(" | ");
-            sb.append(s);
+            if (lines.length() > 0) lines.append(" | ");
+            lines.append(s);
         }
+        if (lines.length() == 0) return;
+        if (sb.length() > 0) sb.append(" | ");
+        sb.append(label).append(':').append(lines);
     }
 
 }

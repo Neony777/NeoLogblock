@@ -223,7 +223,9 @@ public class LbCommand {
 
         if (total == 0 || from >= total) {
             sink.accept(ChatFormatter.noResults());
-            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+            if (page > 0 && totalPages > 1) {
+                sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+            }
             return new TimelineResult(totalPages, false);
         }
 
@@ -295,7 +297,9 @@ public class LbCommand {
 
         if (total == 0 || from >= total) {
             sink.accept(ChatFormatter.noResults());
-            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+            if (page > 0 && totalPages > 1) {
+                sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+            }
             return false;
         }
 
