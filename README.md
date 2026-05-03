@@ -16,11 +16,16 @@ A full-featured grief-logging and rollback mod for NeoForge 1.21.1, inspired by 
 - **Async write queue** — logging never blocks the main server thread
 - **`/lb` command system** — advanced queries, area searches, and operator rollback/redo
 
+## Downloads
+
+- **GitHub Releases:** https://github.com/Neony777/NeoLogblock/releases
+- **Direct (1.0.0):** https://github.com/Neony777/NeoLogblock/releases/download/v1.0.0/NeoLogblock-1.0.0.jar
+
 ## Installation
 
-1. Download the mod JAR from `build/libs/` after building
-2. Place the JAR in your NeoForge server's `mods/` folder
-3. Launch the server — the database is created automatically at `config/logblock/logblock.db`
+1. Download `NeoLogblock-1.0.0.jar` from the [Releases page](https://github.com/Neony777/NeoLogblock/releases) (or build it yourself — see _Building from Source_).
+2. Place the JAR in your NeoForge 1.21.1 server's `mods/` folder.
+3. Launch the server — the database is created automatically at `config/logblock/logblock.db`.
 
 ## Database backend
 
@@ -84,7 +89,7 @@ chmod +x gradlew
 ./gradlew build
 ```
 
-The output JAR is at `build/libs/logblock-1.0.0.jar`.
+The output JAR is at `build/libs/NeoLogblock-1.0.0.jar`.
 
 ### Run a test server
 
