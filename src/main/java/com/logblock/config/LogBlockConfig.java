@@ -23,6 +23,7 @@ public class LogBlockConfig {
     public static final ModConfigSpec.BooleanValue LOG_CONTAINERS;
     public static final ModConfigSpec.BooleanValue LOG_EXPLOSIONS;
     public static final ModConfigSpec.BooleanValue LOG_ENTITIES;
+    public static final ModConfigSpec.BooleanValue LOG_SIGNS;
     public static final ModConfigSpec.IntValue MAX_ROLLBACK_RADIUS;
     public static final ModConfigSpec.BooleanValue PLAY_SOUNDS;
     public static final ModConfigSpec.DoubleValue SOUND_VOLUME;
@@ -118,6 +119,12 @@ public class LogBlockConfig {
         LOG_ENTITIES = BUILDER
             .comment("Log entity kills (mobs killed by players or other entities).")
             .define("logEntities", true);
+
+        LOG_SIGNS = BUILDER
+            .comment("Log player edits to sign text (the writing on signs).",
+                     "Captures the previous text and the new text so the inspector",
+                     "shows e.g. OAK_SIGN {Hello} -> OAK_SIGN {Hi there}.")
+            .define("logSigns", true);
 
         MAX_ROLLBACK_RADIUS = BUILDER
             .comment("Maximum radius allowed for /lb rollback (in blocks).")

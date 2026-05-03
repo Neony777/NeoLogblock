@@ -53,15 +53,44 @@ public final class ChatFormatter {
 
     /**
      * Header for the unified per-coordinate timeline that interleaves block,
-     * container and interaction events at one position.
+     * container and interaction events at one position. The "(page N of M)"
+     * suffix is omitted when there is only a single page.
      */
     public static Component timelineHeader(int x, int y, int z, String world,
                                            int page, int totalPages, boolean canTeleport) {
         MutableComponent c = Component.literal("Activity at ").withStyle(ChatFormatting.GRAY);
         c.append(coordComponent(x, y, z, world, canTeleport));
-        c.append(Component.literal(" (page " + (page + 1) + " of " + totalPages + "):")
-            .withStyle(ChatFormatting.GRAY));
+        if (totalPages > 1) {
+            c.append(Component.literal(" (page " + (page + 1) + " of " + totalPages + ")")
+                .withStyle(ChatFormatting.GRAY));
+        }
+        c.append(Component.literal(":").withStyle(ChatFormatting.GRAY));
         return c;
+    }
+
+    /**
+     * Header for the area timeline (block + container + interaction events
+     * within a cubic radius). Mirrors {@link #timelineHeader} -- omits the
+     * "(page N of M)" suffix when there is only a single page.
+     */
+    public static Component areaTimelineHeader(int radius, int page, int totalPages) {
+        MutableComponent c = Component.literal("Activity within " + radius + " blocks")
+            .withStyle(ChatFormatting.GOLD);
+        if (totalPages > 1) {
+            c.append(Component.literal(" (page " + (page + 1) + " of " + totalPages + ")")
+                .withStyle(ChatFormatting.GOLD));
+        }
+        c.append(Component.literal(":").withStyle(ChatFormatting.GOLD));
+        return c;
+    }
+
+    /**
+     * The "Sneak+right-click to view next page" hint, styled to sit above the
+     * pagination button bar.
+     */
+    public static Component sneakHint() {
+        return Component.literal("Sneak+right-click to view next page.")
+            .withStyle(Style.EMPTY.withColor(ChatFormatting.DARK_GRAY).withItalic(true));
     }
 
     public static Component formatInteractionEntry(InteractionLogEntry e) {
@@ -100,42 +129,57 @@ public final class ChatFormatter {
     }
 
     /**
-     * Clickable pagination bar: [ ◄ Prev   Page N   Next ► ]
-     * Prev is enabled when {@code page > 0}; Next is enabled when {@code hasMore} is true
-     * (caller signals this with {@code entries.size() == pageSize}).
-     * Disabled buttons render in dark grey and have no click event.
+     * Clickable pagination bar:  ◄ Prev   ·   Page N / M   ·   Next ►
+     * Enabled buttons render bold green with hover + click; disabled ones
+     * render plain dark grey (no arrow noise) and have no click event.
      */
-    public static Component paginationFooter(int page, boolean hasMore) {
+    public static Component paginationFooter(int page, int totalPages) {
         boolean hasPrev = page > 0;
-        MutableComponent bar = Component.literal("[ ").withStyle(ChatFormatting.DARK_GRAY);
+        boolean hasNext = page + 1 < totalPages;
+        Component sep = Component.literal("  \u00b7  ").withStyle(ChatFormatting.DARK_GRAY);
+
+        MutableComponent bar = Component.empty();
 
         // Prev
-        Style prevStyle = hasPrev
-            ? Style.EMPTY.withColor(ChatFormatting.GREEN).withBold(true)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lb page " + page))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    Component.literal("Go to page " + page).withStyle(ChatFormatting.GREEN)))
-            : Style.EMPTY.withColor(ChatFormatting.DARK_GRAY);
-        bar.append(Component.literal("◄ Prev").withStyle(prevStyle));
+        if (hasPrev) {
+            bar.append(Component.literal("\u25c0 Prev").withStyle(
+                Style.EMPTY.withColor(ChatFormatting.GREEN).withBold(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lb page " + page))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("Go to page " + page).withStyle(ChatFormatting.GREEN)))));
+        } else {
+            bar.append(Component.literal("Prev").withStyle(ChatFormatting.DARK_GRAY));
+        }
 
-        // Centre marker
-        bar.append(Component.literal("   Page ").withStyle(ChatFormatting.GRAY));
+        // Centre: Page N / M
+        bar.append(sep);
+        bar.append(Component.literal("Page ").withStyle(ChatFormatting.GRAY));
         bar.append(Component.literal(String.valueOf(page + 1))
             .withStyle(Style.EMPTY.withColor(ChatFormatting.WHITE).withBold(true)));
-        bar.append(Component.literal("   ").withStyle(ChatFormatting.GRAY));
+        bar.append(Component.literal(" / " + totalPages).withStyle(ChatFormatting.DARK_GRAY));
+        bar.append(sep);
 
         // Next
         int nextPage = page + 2; // 1-indexed for /lb page
-        Style nextStyle = hasMore
-            ? Style.EMPTY.withColor(ChatFormatting.GREEN).withBold(true)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lb page " + nextPage))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                    Component.literal("Go to page " + nextPage).withStyle(ChatFormatting.GREEN)))
-            : Style.EMPTY.withColor(ChatFormatting.DARK_GRAY);
-        bar.append(Component.literal("Next ►").withStyle(nextStyle));
-
-        bar.append(Component.literal(" ]").withStyle(ChatFormatting.DARK_GRAY));
+        if (hasNext) {
+            bar.append(Component.literal("Next \u25b6").withStyle(
+                Style.EMPTY.withColor(ChatFormatting.GREEN).withBold(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lb page " + nextPage))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("Go to page " + nextPage).withStyle(ChatFormatting.GREEN)))));
+        } else {
+            bar.append(Component.literal("Next").withStyle(ChatFormatting.DARK_GRAY));
+        }
         return bar;
+    }
+
+    /**
+     * Back-compat overload used by command outputs that don't pre-compute a
+     * total. Renders as if page count is "page+1 (more)" / "page+1" — Next
+     * enabled iff {@code hasMore}.
+     */
+    public static Component paginationFooter(int page, boolean hasMore) {
+        return paginationFooter(page, page + (hasMore ? 2 : 1));
     }
 
 
@@ -348,10 +392,29 @@ public final class ChatFormatter {
      */
     public static String displayName(String resourceOrState) {
         if (resourceOrState == null || resourceOrState.isBlank()) return "AIR";
+        // First strip the block-state suffix in [...] (always uppercased).
         int bracket = resourceOrState.indexOf('[');
-        String id = bracket >= 0 ? resourceOrState.substring(0, bracket) : resourceOrState;
+        // Then split off any sign-text payload in {...} so we can preserve its case.
+        int brace = resourceOrState.indexOf('{');
+        int cut;
+        if (bracket >= 0 && (brace < 0 || bracket < brace)) cut = bracket;
+        else if (brace >= 0) cut = brace;
+        else cut = -1;
+
+        String id = cut >= 0 ? resourceOrState.substring(0, cut) : resourceOrState;
         String path = id.contains(":") ? id.split(":", 2)[1] : id;
-        return path.toUpperCase();
+        String shown = path.toUpperCase();
+
+        // If we cut at a '{', preserve the sign-text payload (truncated for chat).
+        if (brace >= 0 && (bracket < 0 || brace < bracket)) {
+            String payload = resourceOrState.substring(brace);
+            // payload looks like "{...}"; trim trailing brace defensively
+            if (payload.endsWith("}")) payload = payload.substring(0, payload.length() - 1);
+            String inside = payload.substring(1);
+            if (inside.length() > 30) inside = inside.substring(0, 30) + "\u2026";
+            shown += " {" + inside + "}";
+        }
+        return shown;
     }
 
     /** Formats elapsed ms as "N minutes / N hours / N days" relative to now. */

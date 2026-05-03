@@ -4,7 +4,7 @@ import com.logblock.LogBlockMod;
 import com.logblock.commands.LbCommand;
 import com.logblock.config.LogBlockConfig;
 import com.logblock.database.DatabaseManager;
-import net.minecraft.ChatFormatting;
+import com.logblock.util.ChatFormatter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -30,6 +30,18 @@ public class InspectorHandler {
 
     /** Per-player last inspected position (for page continuity) */
     private static final Map<UUID, BlockPos> lastInspectedPos = new ConcurrentHashMap<>();
+
+    /**
+     * Per-player per-block "last hint shown" timestamp. The Sneak+right-click
+     * hint is only printed the first time a player inspects a particular
+     * block, then suppressed for {@link #HINT_COOLDOWN_MS} ms.
+     */
+    private static final Map<HintKey, Long> lastHintMs = new ConcurrentHashMap<>();
+
+    /** 10 minutes — after this, the hint is shown again on the next inspect. */
+    private static final long HINT_COOLDOWN_MS = 10L * 60L * 1000L;
+
+    private record HintKey(UUID player, String world, BlockPos pos) {}
 
     @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
@@ -71,20 +83,50 @@ public class InspectorHandler {
 
         SoundEffects.playInspect(player);
 
-        boolean foundAny = LbCommand.showCoordinateTimeline(
+        // Decide whether to attach the "Sneak+right-click" hint above the
+        // pagination bar. Only on the first click on a particular block, with
+        // a 10-minute cooldown per player+block. Skipped entirely when this is
+        // already a sneak-paginate click (page > 0) since the player obviously
+        // already knows the gesture.
+        Component hint = null;
+        if (page == 0 && shouldShowHint(player.getUUID(), world, pos)) {
+            hint = ChatFormatter.sneakHint();
+        }
+
+        LbCommand.TimelineResult result = LbCommand.showCoordinateTimeline(
             player::sendSystemMessage,
             world, pos.getX(), pos.getY(), pos.getZ(),
-            sinceMs, page, pageSize, canTeleport);
+            sinceMs, page, pageSize, canTeleport, hint);
 
-        if (foundAny) {
+        if (result.foundAny()) {
             SoundEffects.playQuery(player);
         } else {
             SoundEffects.playNoResults(player);
         }
 
-        if (page == 0) {
-            player.sendSystemMessage(Component.literal(
-                "Sneak+right-click to view next page.").withStyle(ChatFormatting.DARK_GRAY));
+        // Only mark the hint as "shown" when it actually rendered (i.e. there
+        // was more than one page). One-page results don't print the hint and
+        // shouldn't burn the cooldown.
+        if (hint != null && result.totalPages() > 1) {
+            markHintShown(player.getUUID(), world, pos);
         }
+
+        // Opportunistically prune stale cooldown entries to keep the map small.
+        pruneExpiredHints();
+    }
+
+    private static boolean shouldShowHint(UUID player, String world, BlockPos pos) {
+        Long last = lastHintMs.get(new HintKey(player, world, pos.immutable()));
+        return last == null || (System.currentTimeMillis() - last) >= HINT_COOLDOWN_MS;
+    }
+
+    private static void markHintShown(UUID player, String world, BlockPos pos) {
+        lastHintMs.put(new HintKey(player, world, pos.immutable()), System.currentTimeMillis());
+    }
+
+    private static void pruneExpiredHints() {
+        if (lastHintMs.isEmpty()) return;
+        long cutoff = System.currentTimeMillis() - HINT_COOLDOWN_MS;
+        lastHintMs.entrySet().removeIf(e -> e.getValue() < cutoff);
     }
 }

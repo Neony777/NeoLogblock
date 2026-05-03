@@ -8,6 +8,7 @@ A full-featured grief-logging and rollback mod for NeoForge 1.21.1, inspired by 
 
 - **Block logging** — every block placement, destruction, and explosion is recorded with player name and timestamp
 - **Container logging** — tracks items taken from or put into chests, barrels, furnaces, hoppers, dispensers, droppers, and shulker boxes
+- **Sign text logging** — records edits to sign text (before → after) so you can see what was rewritten on a sign
 - **Inspector tool** — right-click any block with a wooden pickaxe (configurable) to view its full change history in chat
 - **Sneak + right-click** — cycles through pages of history for a block
 - **Paginated chat output** — color-coded entries matching the original LogBlock plugin style
@@ -19,11 +20,11 @@ A full-featured grief-logging and rollback mod for NeoForge 1.21.1, inspired by 
 ## Downloads
 
 - **GitHub Releases:** https://github.com/Neony777/NeoLogblock/releases
-- **Direct (1.0.0):** https://github.com/Neony777/NeoLogblock/releases/download/v1.0.0/NeoLogblock-1.0.0.jar
+- **Direct (1.1.0):** https://github.com/Neony777/NeoLogblock/releases/download/v1.1.0/NeoLogblock-1.1.0.jar
 
 ## Installation
 
-1. Download `NeoLogblock-1.0.0.jar` from the [Releases page](https://github.com/Neony777/NeoLogblock/releases) (or build it yourself — see _Building from Source_).
+1. Download `NeoLogblock-1.1.0.jar` from the [Releases page](https://github.com/Neony777/NeoLogblock/releases) (or build it yourself — see _Building from Source_).
 2. Place the JAR in your NeoForge 1.21.1 server's `mods/` folder.
 3. Launch the server — the database is created automatically at `config/logblock/logblock.db`.
 
@@ -89,7 +90,7 @@ chmod +x gradlew
 ./gradlew build
 ```
 
-The output JAR is at `build/libs/NeoLogblock-1.0.0.jar`.
+The output JAR is at `build/libs/NeoLogblock-1.1.0.jar`.
 
 ### Run a test server
 
@@ -164,6 +165,7 @@ The config file is generated at `config/logblock-common.toml` on first launch:
     logBlocks = true
     logContainers = true
     logExplosions = true
+    logSigns = true
 
     # Maximum radius for /lb rollback
     maxRollbackRadius = 50

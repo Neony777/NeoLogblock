@@ -164,11 +164,11 @@ public class LbCommand {
             queryContexts.put(player.getUUID(),
                 new QueryContext("coord", world, pos.getX(), pos.getY(), pos.getZ(), 0, null, sinceMs));
 
-            boolean foundAny = showCoordinateTimeline(
+            TimelineResult result = showCoordinateTimeline(
                 source::sendSystemMessage,
                 world, pos.getX(), pos.getY(), pos.getZ(),
                 sinceMs, page, pageSize, canTeleport);
-            playResultSound(player, foundAny);
+            playResultSound(player, result.foundAny());
         } catch (Exception e) {
             source.sendFailure(Component.literal(e.getMessage()));
         }
@@ -181,14 +181,32 @@ public class LbCommand {
      * found in the active page. Pulled out so {@link com.logblock.events.InspectorHandler}
      * can share the same renderer.
      */
-    public static boolean showCoordinateTimeline(java.util.function.Consumer<Component> sink,
-                                                 String world, int x, int y, int z,
-                                                 long sinceMs, int page, int pageSize,
-                                                 boolean canTeleport) {
+    /** Result of rendering a timeline view. */
+    public record TimelineResult(int totalPages, boolean foundAny) {
+        public static final TimelineResult EMPTY = new TimelineResult(0, false);
+    }
+
+    public static TimelineResult showCoordinateTimeline(java.util.function.Consumer<Component> sink,
+                                                        String world, int x, int y, int z,
+                                                        long sinceMs, int page, int pageSize,
+                                                        boolean canTeleport) {
+        return showCoordinateTimeline(sink, world, x, y, z, sinceMs, page, pageSize, canTeleport, null);
+    }
+
+    /**
+     * @param preFooterHint optional component (e.g. the "Sneak+right-click..." hint)
+     *                      printed immediately above the pagination bar; ignored when
+     *                      there's only one page. Pass {@code null} to omit.
+     */
+    public static TimelineResult showCoordinateTimeline(java.util.function.Consumer<Component> sink,
+                                                        String world, int x, int y, int z,
+                                                        long sinceMs, int page, int pageSize,
+                                                        boolean canTeleport,
+                                                        Component preFooterHint) {
         DatabaseManager db = LogBlockMod.getDatabase();
         if (db == null) {
             sink.accept(Component.literal("LogBlock database not ready.").withStyle(ChatFormatting.RED));
-            return false;
+            return TimelineResult.EMPTY;
         }
 
         // True total via cheap COUNT(*) per table — this drives correct page
@@ -205,8 +223,8 @@ public class LbCommand {
 
         if (total == 0 || from >= total) {
             sink.accept(ChatFormatter.noResults());
-            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, false));
-            return false;
+            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+            return new TimelineResult(totalPages, false);
         }
 
         // To render page `page`, the worst-case is that one source supplies
@@ -243,9 +261,11 @@ public class LbCommand {
         } else {
             for (int i = from; i < sliceEnd; i++) sink.accept(all.get(i).formatted());
         }
-        sink.accept(ChatFormatter.summary(displayed, page, "change(s)"));
-        sink.accept(ChatFormatter.paginationFooter(page, page + 1 < totalPages));
-        return true;
+        if (totalPages > 1) {
+            if (preFooterHint != null) sink.accept(preFooterHint);
+            sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+        }
+        return new TimelineResult(totalPages, true);
     }
 
     /**
@@ -271,13 +291,11 @@ public class LbCommand {
         int from             = page * pageSize;
         int to               = Math.min(from + pageSize, total);
 
-        sink.accept(Component.literal(
-            "Activity within " + radius + " blocks (page " + (page + 1) + " of " + totalPages + "):")
-            .withStyle(ChatFormatting.GOLD));
+        sink.accept(ChatFormatter.areaTimelineHeader(radius, page, totalPages));
 
         if (total == 0 || from >= total) {
             sink.accept(ChatFormatter.noResults());
-            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, false));
+            if (page > 0) sink.accept(ChatFormatter.paginationFooter(page, totalPages));
             return false;
         }
 
@@ -311,8 +329,9 @@ public class LbCommand {
         } else {
             for (int i = from; i < sliceEnd; i++) sink.accept(all.get(i).formatted());
         }
-        sink.accept(ChatFormatter.summary(displayed, page, "change(s)"));
-        sink.accept(ChatFormatter.paginationFooter(page, page + 1 < totalPages));
+        if (totalPages > 1) {
+            sink.accept(ChatFormatter.paginationFooter(page, totalPages));
+        }
         return true;
     }
 
@@ -432,11 +451,11 @@ public class LbCommand {
             switch (ctx.type()) {
                 // "block" + "container" remain as aliases routed into the unified timeline
                 case "coord", "block", "container" -> {
-                    boolean foundAny = showCoordinateTimeline(
+                    TimelineResult result = showCoordinateTimeline(
                         source::sendSystemMessage,
                         ctx.world(), ctx.x(), ctx.y(), ctx.z(),
                         ctx.sinceMs(), page, pageSize, canTeleport);
-                    playResultSound(player, foundAny);
+                    playResultSound(player, result.foundAny());
                 }
                 case "player" -> executePlayerQuery(source, ctx.playerFilter(), page);
                 case "area" -> {
