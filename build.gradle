@@ -68,6 +68,7 @@ dependencies {
 }
 
 jar {
+    archiveBaseName = 'NeoLogblock'
     // Pack all 'embed' jars (i.e. SQLite) into the mod JAR
     from {
         configurations.embed.collect { dep ->
