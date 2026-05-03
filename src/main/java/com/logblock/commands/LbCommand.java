@@ -55,6 +55,18 @@ public class LbCommand {
         long sinceMs
     ) {}
 
+    /**
+     * Registers an "active query" for the given player at the given coordinate
+     * so that follow-up commands like {@code /lb page <n>} and {@code /lb time
+     * <minutes>} — and the Prev/Next pagination buttons in chat (which run
+     * {@code /lb page}) — know what to re-query. Used by the right-click
+     * inspector so its chat pagination buttons work without first running
+     * {@code /lb block}.
+     */
+    public static void setCoordQueryContext(UUID player, String world, int x, int y, int z, long sinceMs) {
+        queryContexts.put(player, new QueryContext("coord", world, x, y, z, 0, null, sinceMs));
+    }
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         var lb = Commands.literal("lb");

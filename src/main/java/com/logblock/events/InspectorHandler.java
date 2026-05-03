@@ -79,6 +79,12 @@ public class InspectorHandler {
         playerPages.put(player.getUUID(), page);
         lastInspectedPos.put(player.getUUID(), pos);
 
+        // Register an "active query" for this player so the chat pagination
+        // buttons (Prev / Next, which run /lb page <n>) work without the player
+        // having to run /lb block first.
+        LbCommand.setCoordQueryContext(player.getUUID(), world,
+            pos.getX(), pos.getY(), pos.getZ(), sinceMs);
+
         boolean canTeleport = player.hasPermissions(LogBlockConfig.TELEPORT_PERMISSION_LEVEL.get());
 
         SoundEffects.playInspect(player);
