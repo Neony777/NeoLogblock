@@ -343,6 +343,26 @@ public class DatabaseManager {
         }
     }
 
+    /**
+     * Callable-returning variant of {@link #submitWrite(Runnable)}. Returns
+     * {@code null} (instead of throwing) if the write queue is shut down or
+     * rejects the task, allowing callers that need a result to fall back
+     * gracefully during shutdown.
+     */
+    private <T> java.util.concurrent.Future<T> submitWrite(java.util.concurrent.Callable<T> task) {
+        if (writeQueue.isShutdown()) {
+            LogBlockMod.LOGGER.warn("LogBlock: dropping log write — database is shutting down.");
+            return null;
+        }
+        try {
+            return writeQueue.submit(task);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            LogBlockMod.LOGGER.warn("LogBlock: dropping log write — write queue rejected the task ({}).",
+                e.getMessage());
+            return null;
+        }
+    }
+
     public void logBlockChange(String world, int x, int y, int z,
                                String blockBefore, String blockAfter,
                                String blockEntityNbt,
@@ -913,8 +933,12 @@ public class DatabaseManager {
      * table is logged but does not abort the others.
      */
     public PurgeResult purgeOlderThan(long cutoffMs) {
+        java.util.concurrent.Future<PurgeResult> f = submitWrite(() -> doPurge(cutoffMs));
+        if (f == null) {
+            return new PurgeResult(0, 0, 0, 0, 0);
+        }
         try {
-            return writeQueue.submit(() -> doPurge(cutoffMs)).get();
+            return f.get();
         } catch (Exception e) {
             LogBlockMod.LOGGER.error("LogBlock: purge failed", e);
             return new PurgeResult(0, 0, 0, 0, 0);
