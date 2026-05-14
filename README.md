@@ -20,11 +20,11 @@ A full-featured grief-logging and rollback mod for NeoForge 1.21.1, inspired by 
 ## Downloads
 
 - **GitHub Releases:** https://github.com/Neony777/NeoLogblock/releases
-- **Direct (1.1.1):** https://github.com/Neony777/NeoLogblock/releases/download/v1.1.1/NeoLogblock-1.1.1.jar
+- **Direct (1.1.2):** https://github.com/Neony777/NeoLogblock/releases/download/v1.1.2/NeoLogblock-1.1.2.jar
 
 ## Installation
 
-1. Download `NeoLogblock-1.1.1.jar` from the [Releases page](https://github.com/Neony777/NeoLogblock/releases) (or build it yourself — see _Building from Source_).
+1. Download `NeoLogblock-1.1.2.jar` from the [Releases page](https://github.com/Neony777/NeoLogblock/releases) (or build it yourself — see _Building from Source_).
 2. Place the JAR in your NeoForge 1.21.1 server's `mods/` folder.
 3. Launch the server — the database is created automatically at `config/logblock/logblock.db`.
 
@@ -90,7 +90,7 @@ chmod +x gradlew
 ./gradlew build
 ```
 
-The output JAR is at `build/libs/NeoLogblock-1.1.1.jar`.
+The output JAR is at `build/libs/NeoLogblock-1.1.2.jar`.
 
 ### Run a test server
 

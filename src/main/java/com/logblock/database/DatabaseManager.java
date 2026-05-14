@@ -321,12 +321,34 @@ public class DatabaseManager {
     }
 
 
+    /**
+     * Safe wrapper around {@code writeQueue.submit}. The Minecraft server can
+     * still tick entities and dispatch events for a short window after
+     * {@link #shutdown()} terminates the executor — for example, an entity
+     * dying in lava during the stop sequence still fires {@code LivingDeathEvent}
+     * on the server thread. Submitting to a terminated executor would throw
+     * {@link RejectedExecutionException} which crashes the server. This helper
+     * silently drops the write (with a single WARN) instead.
+     */
+    private void submitWrite(Runnable task) {
+        if (writeQueue.isShutdown()) {
+            LogBlockMod.LOGGER.warn("LogBlock: dropping log write — database is shutting down.");
+            return;
+        }
+        try {
+            writeQueue.submit(task);
+        } catch (java.util.concurrent.RejectedExecutionException e) {
+            LogBlockMod.LOGGER.warn("LogBlock: dropping log write — write queue rejected the task ({}).",
+                e.getMessage());
+        }
+    }
+
     public void logBlockChange(String world, int x, int y, int z,
                                String blockBefore, String blockAfter,
                                String blockEntityNbt,
                                String actorName, String actorType, String action) {
         long ts = System.currentTimeMillis();
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -359,7 +381,7 @@ public class DatabaseManager {
                                    String containerType, String item, int amount,
                                    String actorName, String action) {
         long ts = System.currentTimeMillis();
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -391,7 +413,7 @@ public class DatabaseManager {
                               String entityType, String entityName,
                               String killerName, String killerType) {
         long ts = System.currentTimeMillis();
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -421,7 +443,7 @@ public class DatabaseManager {
     public void logInteraction(String world, int x, int y, int z,
                                String blockType, String action, String actorName) {
         long ts = System.currentTimeMillis();
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -449,7 +471,7 @@ public class DatabaseManager {
 
     public void saveRollbackSession(String playerName, String world, String blocksJson) {
         long ts = System.currentTimeMillis();
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -470,7 +492,7 @@ public class DatabaseManager {
     }
 
     public void markRollbackComplete(String playerName) {
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             Connection c = null;
             try {
                 c = borrow();
@@ -906,7 +928,7 @@ public class DatabaseManager {
      * stall ticks or trip the server watchdog.
      */
     public void purgeOlderThanAsync(long cutoffMs, java.util.function.Consumer<PurgeResult> onDone) {
-        writeQueue.submit(() -> {
+        submitWrite(() -> {
             PurgeResult r = doPurge(cutoffMs);
             try { onDone.accept(r); } catch (Exception e) {
                 LogBlockMod.LOGGER.error("LogBlock: purge callback failed", e);
